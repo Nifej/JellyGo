@@ -140,7 +140,29 @@ describe('poderes do cientista (applyPower)', () => {
     expect(target.poison).toBeUndefined();
     expect(target.units).toBeLessThan(unitsBefore);
   });
-  it.todo('convert vira SOMENTE a base alvo para o time do cientista');
+  it('convert vira SOMENTE a base alvo para o time do cientista', () => {
+    const s = makeState([
+      makeNode({ id: 0, pos: { x: 100, y: 300 }, team: 0, units: C.COST_CONVERT + 5, role: 'scientist' }),
+      makeNode({ id: 1, pos: { x: 110, y: 300 }, team: 1, units: 30, role: 'generator' }), // alvo
+      makeNode({ id: 2, pos: { x: 800, y: 300 }, team: 1, units: 20, role: 'tower' }), // NÃO afetada
+    ]);
+
+    run(s, 1, [{ type: 'castPower', from: 0, target: 1, power: 'convert' }]);
+
+    // (1) base alvo convertida
+    const target = s.nodes[1];
+    expect(target.team).toBe(0);
+    expect(target.units).toBe(C.CONVERT_CARRY);
+    expect(target.role).toBe('generator');
+    expect(target.level).toBe(1);
+    expect(target.frozen).toBeUndefined();
+    expect(target.poison).toBeUndefined();
+
+    // (2) segunda base inimiga intacta
+    const other = s.nodes[2];
+    expect(other.team).toBe(1);
+    expect(other.units).toBe(20);
+  });
 });
 
 describe('torre (fireTowers)', () => {
