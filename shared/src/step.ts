@@ -180,6 +180,7 @@ function resolveAttack(node: BaseNode, pr: Projectile): void {
 //  comportamento esperado em step.test.ts).
 // ====================================================================
 function applyPower(_state: GameState, pr: Projectile, node: BaseNode): void {
+  if (node.team === pr.team) return; // alvo virou aliado em pleno voo: o poder fizzla
   switch (pr.power) {
     case 'freeze':
       node.frozen = { lockedUnits: node.units, debtRemaining: node.units };
