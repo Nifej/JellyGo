@@ -119,7 +119,27 @@ describe('poderes do cientista (applyPower)', () => {
     expect(target.units).toBe(INITIAL_UNITS);
   });
 
-  it.todo('poison aplica PoisonState na base alvo');
+  it('poison aplica PoisonState na base alvo e drena geleias', () => {
+    // Cientista próximo ao alvo → projétil chega no 1º tick.
+    const s = makeState([
+      makeNode({ id: 0, pos: { x: 100, y: 300 }, team: 0, units: C.COST_POISON + 5, role: 'scientist' }),
+      makeNode({ id: 1, pos: { x: 110, y: 300 }, team: 1, units: 40, role: 'generator' }),
+    ]);
+
+    // Lança poison; verifica o estado logo após a chegada do projétil.
+    run(s, 0.1, [{ type: 'castPower', from: 0, target: 1, power: 'poison' }]);
+
+    const target = s.nodes[1];
+    expect(target.poison).toBeDefined();
+    expect(target.poison!.ratePerSec).toBe(C.POISON_RATE);
+    expect(target.poison!.secondsLeft).toBeCloseTo(C.POISON_DURATION, 0);
+
+    // Após a duração completa o poison some e as geleias reduziram.
+    const unitsBefore = target.units;
+    run(s, C.POISON_DURATION + 1);
+    expect(target.poison).toBeUndefined();
+    expect(target.units).toBeLessThan(unitsBefore);
+  });
   it.todo('convert vira SOMENTE a base alvo para o time do cientista');
 });
 
