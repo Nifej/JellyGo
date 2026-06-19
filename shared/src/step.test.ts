@@ -166,6 +166,61 @@ describe('poderes do cientista (applyPower)', () => {
 });
 
 describe('torre (fireTowers)', () => {
-  it.todo('torre dispara em projétil inimigo dentro do alcance');
-  it.todo('towerShot reduz units do projétil alvo e o remove se zerar');
+  it('torre dispara em projétil inimigo dentro do alcance', () => {
+    const s = makeState([
+      makeNode({ id: 0, pos: { x: 300, y: 300 }, team: 0, units: 0, role: 'tower' }),
+      makeNode({ id: 1, pos: { x: 0, y: 300 }, team: 0, units: 20, role: 'generator' }), // mantém time 0
+      makeNode({ id: 2, pos: { x: 1000, y: 300 }, team: 1, units: 20, role: 'generator' }),
+    ]);
+
+    // Projétil inimigo dentro do alcance, se movendo para longe da torre (→ permanece no range)
+    s.projectiles.push({
+      id: s.nextProjectileId++,
+      kind: 'attack',
+      team: 1,
+      pos: { x: 320, y: 300 },   // 20px da torre; move-se para esquerda
+      speed: C.SPEED_ATTACK,
+      targetNodeId: 1,
+      units: 20,
+    });
+
+    run(s, C.TOWER_FIRE_INTERVAL + 0.1);
+
+    expect(s.projectiles.some(p => p.kind === 'towerShot' && p.team === 0)).toBe(true);
+  });
+
+  it('towerShot reduz units do projétil alvo e o remove se zerar', () => {
+    const s = makeState([
+      makeNode({ id: 0, pos: { x: 0, y: 300 }, team: 0, units: 20, role: 'generator' }),
+      makeNode({ id: 1, pos: { x: 1000, y: 300 }, team: 1, units: 20, role: 'generator' }),
+    ]);
+
+    // Projétil inimigo com units exatamente TOWER_DAMAGE → deve ser removido no hit
+    const attackId = s.nextProjectileId;
+    s.projectiles.push({
+      id: s.nextProjectileId++,
+      kind: 'attack',
+      team: 1,
+      pos: { x: 350, y: 300 },
+      speed: C.SPEED_ATTACK,
+      targetNodeId: 0,
+      units: C.TOWER_DAMAGE,
+    });
+
+    // TowerShot já muito próximo do alvo (distância 5 < NODE_RADIUS*0.6=18) → acerta no 1º tick
+    s.projectiles.push({
+      id: s.nextProjectileId++,
+      kind: 'towerShot',
+      team: 0,
+      pos: { x: 345, y: 300 },
+      speed: C.SPEED_TOWER,
+      targetProjectileId: attackId,
+    });
+
+    run(s, 1 / C.TICKS_PER_SEC);
+
+    // Ambos devem ter sido removidos: ataque zerou, towerShot consumido
+    expect(s.projectiles.some(p => p.kind === 'attack' && p.team === 1)).toBe(false);
+    expect(s.projectiles.some(p => p.kind === 'towerShot')).toBe(false);
+  });
 });

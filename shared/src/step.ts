@@ -132,8 +132,9 @@ function applyPoison(state: GameState, dt: number): void {
 function advanceProjectiles(state: GameState, dt: number): void {
   const survivors: Projectile[] = [];
   for (const pr of state.projectiles) {
+    if (pr.kind === 'towerShot') { survivors.push(pr); continue; } // movimento tratado em fireTowers
     const target = pr.targetNodeId !== undefined ? nodeById(state, pr.targetNodeId) : undefined;
-    if (!target) continue; // alvo sumiu -> projétil descartado (towerShot tratado em fireTowers)
+    if (!target) continue; // alvo sumiu -> projétil descartado
 
     const dx = target.pos.x - pr.pos.x;
     const dy = target.pos.y - pr.pos.y;
@@ -199,19 +200,63 @@ function applyPower(_state: GameState, pr: Projectile, node: BaseNode): void {
 }
 
 function fireTowers(state: GameState, dt: number): void {
-  // Para cada base com role === 'tower':
-  //   - acumule fireTimer += dt; quando passar de C.TOWER_FIRE_INTERVAL, pode atirar.
-  //   - procure em state.projectiles um projétil INIMIGO (team diferente) dentro de
-  //     C.TOWER_RANGE da torre.
-  //   - crie um projétil kind:'towerShot' (speed C.SPEED_TOWER) com targetProjectileId
-  //     apontando para ele.
-  //   - quando o towerShot alcança o alvo, reduza units do projétil alvo em
-  //     C.TOWER_DAMAGE; se zerar, remova o projétil do estado.
-  //
-  // Dica: towerShot persegue um projétil que se move, então a lógica de chegada dele
-  // fica separada de advanceProjectiles (que só lida com alvos = base).
-  void state;
-  void dt;
+  const killedIds = new Set<number>();   // attack projectiles com units <= 0
+  const consumedIds = new Set<number>(); // towerShots que acertaram ou perderam o alvo
+
+  // Fase A: avança towerShots existentes e resolve colisões
+  for (const ts of state.projectiles) {
+    if (ts.kind !== 'towerShot') continue;
+
+    const target = state.projectiles.find(
+      p => p.id === ts.targetProjectileId && !killedIds.has(p.id),
+    );
+    if (!target) { consumedIds.add(ts.id); continue; } // alvo sumiu
+
+    const dx = target.pos.x - ts.pos.x;
+    const dy = target.pos.y - ts.pos.y;
+    const d = Math.hypot(dx, dy);
+
+    if (d <= C.NODE_RADIUS * 0.6) {
+      target.units = (target.units ?? 0) - C.TOWER_DAMAGE;
+      consumedIds.add(ts.id);
+      if ((target.units ?? 0) <= 0) killedIds.add(target.id);
+    } else {
+      ts.pos.x += (dx / d) * ts.speed * dt;
+      ts.pos.y += (dy / d) * ts.speed * dt;
+    }
+  }
+
+  state.projectiles = state.projectiles.filter(
+    p => !consumedIds.has(p.id) && !killedIds.has(p.id),
+  );
+
+  // Fase B: cada torre pronta dispara no attack inimigo mais próximo dentro do alcance
+  for (const node of state.nodes) {
+    if (node.team === null || node.role !== 'tower') continue;
+
+    node.fireTimer = (node.fireTimer ?? 0) + dt;
+    if (node.fireTimer < C.TOWER_FIRE_INTERVAL) continue;
+    node.fireTimer -= C.TOWER_FIRE_INTERVAL;
+
+    let closest: Projectile | undefined;
+    let closestDist = C.TOWER_RANGE;
+    for (const pr of state.projectiles) {
+      if (pr.kind !== 'attack' || pr.team === node.team) continue;
+      const d = Math.hypot(pr.pos.x - node.pos.x, pr.pos.y - node.pos.y);
+      if (d <= closestDist) { closestDist = d; closest = pr; }
+    }
+
+    if (!closest) continue;
+
+    state.projectiles.push({
+      id: state.nextProjectileId++,
+      kind: 'towerShot',
+      team: node.team,
+      pos: { ...node.pos },
+      speed: C.SPEED_TOWER,
+      targetProjectileId: closest.id,
+    });
+  }
 }
 
 // -------------------------------------------------------------- vitória
