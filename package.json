@@ -1,0 +1,11 @@
+{
+  "name": "geleia-conquista",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["shared", "server", "client"],
+  "scripts": {
+    "test": "npm run test -w @geleia/shared",
+    "dev:server": "npm run dev -w @geleia/server",
+    "dev:client": "npm run dev -w @geleia/client"
+  }
+}
